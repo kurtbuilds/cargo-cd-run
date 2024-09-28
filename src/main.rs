@@ -16,8 +16,6 @@ struct Args {
 fn main() -> AnyResult<()> {
     let args = args_os().skip(1);
     let cli = Args::parse_from(args);
-    dbg!(&cli);
-
     let cargo_args;
     let target_args;
     if cli.args2.is_empty() {
