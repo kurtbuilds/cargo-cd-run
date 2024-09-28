@@ -1,7 +1,7 @@
 use anyhow::Result as AnyResult;
 use clap::Parser;
 use std::env::{args_os, set_current_dir};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std_ext::{CommandExt, OutputExt};
 
 #[derive(Parser, Debug)]
@@ -25,19 +25,18 @@ fn main() -> AnyResult<()> {
         cargo_args = cli.args1;
         target_args = cli.args2;
     }
-
-    Command::new("cargo")
+    let output = Command::new("cargo")
         .arg("build")
+        .arg("--message-format=json")
         .args(cargo_args)
-        .run()?;
-    let target_dir = std::env::var("CARGO_TARGET_DIR");
-    let target_dir = target_dir.as_deref().unwrap_or("target");
-
-    let find = format!("fd . {target_dir}/debug {target_dir}/release -t x --maxdepth 1 -X ls -t | head -n1");
-    let bin = Command::new("/bin/bash")
-        .args(&["-c", &find])
+        .stderr(Stdio::inherit())
         .output()?;
-    let bin = bin.stdout().trim_end();
+    let output = output.stdout();
+    let mut lines = output.lines();
+    _ = lines.next_back(); // skip the last line
+    let last_line = lines.next_back();
+    let data: serde_json::Value = serde_json::from_str(last_line.unwrap())?;
+    let bin = data["executable"].as_str().expect("No executable in cargo build output");
 
     set_current_dir(cli.dir)?;
     Command::new(bin)
